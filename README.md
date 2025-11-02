@@ -1,876 +1,689 @@
-# 📘 API Routes Documentation
+# 📘 دوكيومنتيشن الباك اند الشاملة
+
+## 📑 فهرس المحتويات
+
+1. [مراحل البناء والتاسكات](#مراحل-البناء-والتاسكات)
+2. [مراجع قاعدة البيانات](#مراجع-قاعدة-البيانات)
+3. [الراوتس الكاملة](#الراوتس-الكاملة)
+4. [معايير التطوير](#معايير-التطوير)
+5. [الأخطاء والحلول](#الأخطاء-والحلول)
 
 ---
 
-## 🏢 **1. Companies Routes**
+# 🎯 مراحل البناء والتاسكات
 
-### **GET Routes**
+## المرحلة الأولى: إعداد الأساسيات ✅
 
-```http
-GET /api/companies
+### Task 1.1: تنظيم هيكل المشروع الأساسي
+- [x] إنشاء مجلدات `modules` منفصلة لكل إنتيتي
+- [x] إعداد `config/database.js` و `config/env.js`
+- [x] إعداد `app.js` الرئيسي
+- [x] إعداد `Prisma schema`
+
+**الملفات المطلوبة:**
+```
+src/modules/{entityName}/
+├── {entity}.controller.js      # معالجة الطلبات
+├── {entity}.service.js         # منطق الأعمال
+├── {entity}.repository.js      # الوصول للبيانات
+├── {entity}.routes.js          # تعريف الروتس
+├── {entity}.schema.js          # التحقق من صحة البيانات
+└── {entity}.calculations.js    # الحسابات الخاصة (إن وجدت)
 ```
 
-**Response:**
+---
 
-```json
-{
-  "data": [
-    {
-      "CompanyID": 1,
-      "Name": "شركة الندى",
-      "Logo": "url",
-      "Address": "القاهرة، مصر الجديدة",
-      "Email": "info@alnada.com",
-      "Phone": "0224567890",
-      "SubscriptionExpiryDate": "2025-01-15T10:00:00Z",
-      "CreatedAt": "2025-01-15T10:00:00Z"
-    }
-  ]
+## المرحلة الثانية: بناء الـ Entities الأساسية 🔨
+
+### Task 2.1: Companies Module ⭐ أولوية عالية
+**الوصف:** إدارة الشركات والنسخ وبيانات الاشتراك
+
+**الحقول المطلوبة:**
+```typescript
+Company {
+  id: Int (PK)
+  name: String (required, unique per company)
+  logo: String (URL)
+  address: String
+  email: String (required, unique)
+  phone: String
+  subscriptionExpiryDate: DateTime
+  createdAt: DateTime (auto)
+  updatedAt: DateTime (auto)
 }
 ```
 
+**الراوتس:**
+- `GET /api/companies` - الحصول على جميع الشركات
+- `GET /api/companies/:id` - الحصول على شركة محددة
+- `POST /api/companies` - إنشاء شركة جديدة
+- `PUT /api/companies/:id` - تحديث بيانات الشركة
+- `PUT /api/companies/:id/subscription` - تحديث تاريخ الاشتراك
+- `DELETE /api/companies/:id` - حذف شركة
+
+**الحسابات:**
+- التحقق من صلاحية الاشتراك
+- عداد الأيام المتبقية
+
 ---
 
-### **PUT Routes**
+### Task 2.2: Users Module ⭐ أولوية عالية
+**الوصف:** إدارة المستخدمين والأدوار والصلاحيات
 
-```http
-PUT /api/companies/{CompanyID}/expiry
+**الحقول المطلوبة:**
+```typescript
+User {
+  id: Int (PK)
+  companyId: Int (FK → Company)
+  fullName: String (required)
+  email: String (required, unique per company)
+  passwordHash: String (required, bcrypt)
+  role: Enum (manager, employee, admin, accountant)
+  status: Enum (Active, Inactive, Suspended)
+  lastLoginAt: DateTime (nullable)
+  createdAt: DateTime (auto)
+  updatedAt: DateTime (auto)
+}
 ```
 
-**Body (FormData):**
+**الراوتس:**
+- `GET /api/users` - الحصول على المستخدمين
+- `GET /api/users/:id` - الحصول على مستخدم محدد
+- `GET /api/users/company/:companyId` - المستخدمين بالشركة
+- `POST /api/users` - إنشاء مستخدم جديد
+- `PUT /api/users/:id` - تحديث بيانات المستخدم
+- `PUT /api/users/:id/password` - تغيير كلمة المرور
+- `DELETE /api/users/:id` - حذف مستخدم
 
+**المنطق:**
+- التحقق من البريد الفريد لكل شركة
+- هاش كلمة المرور باستخدام `bcrypt`
+- التحقق من الأدوار المسموحة
+
+---
+
+### Task 2.3: Suppliers Module
+**الوصف:** إدارة الموردين
+
+**الحقول المطلوبة:**
+```typescript
+Supplier {
+  id: Int (PK)
+  companyId: Int (FK → Company)
+  name: String (required)
+  contactInfo: String (phones, emails)
+  address: String (nullable)
+  city: String (nullable)
+  phone: String
+  email: String
+  notes: String (nullable)
+  isActive: Boolean (default: true)
+  createdAt: DateTime (auto)
+}
 ```
-SubscriptionExpiryDate: "2025-12-31T10:00:00Z"
+
+**الراوتس:**
+- `GET /api/suppliers` - الحصول على جميع الموردين
+- `GET /api/suppliers/:id` - تفاصيل مورد
+- `POST /api/suppliers` - إضافة مورد جديد
+- `PUT /api/suppliers/:id` - تحديث بيانات مورد
+- `DELETE /api/suppliers/:id` - حذف مورد
+
+---
+
+### Task 2.4: Products Module
+**الوصف:** إدارة المنتجات والمخزون
+
+**الحقول المطلوبة:**
+```typescript
+Product {
+  id: Int (PK)
+  companyId: Int (FK → Company)
+  supplierId: Int (FK → Supplier)
+  name: String (required)
+  description: String (nullable)
+  category: String (required)
+  price: Decimal (required)
+  stock: Int (default: 0)
+  minStockLevel: Int (default: 10)
+  sku: String (unique per company, nullable)
+  image: String (URL, nullable)
+  createdAt: DateTime (auto)
+}
 ```
 
-**Response:**
+**الراوتس:**
+- `GET /api/products` - جميع المنتجات
+- `GET /api/products/:id` - تفاصيل منتج
+- `GET /api/products/low-stock` - المنتجات قليلة المخزون
+- `GET /api/products/categories` - جميع الفئات
+- `POST /api/products` - إنشاء منتج
+- `PUT /api/products/:id` - تحديث منتج
+- `DELETE /api/products/:id` - حذف منتج
 
+**الحسابات:**
+- تنبيهات المخزون المنخفض (stock < minStockLevel)
+- عداد المنتجات قليلة المخزون
+
+---
+
+### Task 2.5: Accessories Module
+**الوصف:** إدارة الملحقات والإضافات
+
+**الحقول المطلوبة:**
+```typescript
+Accessory {
+  id: Int (PK)
+  companyId: Int (FK → Company)
+  supplierId: Int (FK → Supplier)
+  name: String (required)
+  price: Decimal (required)
+  stock: Int (default: 0)
+  category: String (nullable)
+  sku: String (unique per company)
+  createdAt: DateTime (auto)
+}
+```
+
+**الراوتس:**
+- `GET /api/accessories` - جميع الملحقات
+- `GET /api/accessories/:id` - تفاصيل ملحق
+- `POST /api/accessories` - إنشاء ملحق
+- `PUT /api/accessories/:id` - تحديث ملحق
+- `DELETE /api/accessories/:id` - حذف ملحق
+
+---
+
+### Task 2.6: Services Module
+**الوصف:** إدارة الخدمات المقدمة
+
+**الحقول المطلوبة:**
+```typescript
+Service {
+  id: Int (PK)
+  companyId: Int (FK → Company)
+  name: String (required)
+  description: String (nullable)
+  price: Decimal (required)
+  category: String (nullable)
+  duration: Int (بالدقائق, nullable)
+  isActive: Boolean (default: true)
+  createdAt: DateTime (auto)
+}
+```
+
+**الراوتس:**
+- `GET /api/services` - جميع الخدمات
+- `GET /api/services/:id` - تفاصيل خدمة
+- `POST /api/services` - إنشاء خدمة
+- `PUT /api/services/:id` - تحديث خدمة
+- `DELETE /api/services/:id` - حذف خدمة
+
+---
+
+## المرحلة الثالثة: Entities الوسيطة 🔗
+
+### Task 3.1: ProductAccessory Module
+**الوصف:** الربط بين المنتجات والملحقات (علاقة Many-to-Many)
+
+**الحقول:**
+```typescript
+ProductAccessory {
+  productId: Int (FK)
+  accessoryId: Int (FK)
+  createdAt: DateTime (auto)
+}
+```
+
+**الراوتس:**
+- `GET /api/product-accessories` - جميع العلاقات
+- `GET /api/products/:productId/accessories` - ملحقات منتج
+- `POST /api/product-accessories` - إضافة علاقة (مع منع التكرار)
+- `DELETE /api/product-accessories/:productId/:accessoryId` - حذف علاقة
+
+---
+
+## المرحلة الرابعة: Customers و Employees 👥
+
+### Task 4.1: Customers Module ⭐ أولوية عالية
+**الوصف:** إدارة العملاء والبيانات الشخصية
+
+**الحقول المطلوبة:**
+```typescript
+Customer {
+  id: Int (PK)
+  companyId: Int (FK → Company)
+  fullName: String (required)
+  nationalId: String (required, unique per company)
+  customerType: Enum (Installation, Maintenance)
+  idCardImage: String (URL, nullable)
+  primaryNumber: String (required)
+  secondaryNumber: String (nullable)
+  governorate: String (required)
+  city: String (required)
+  district: String (required)
+  address: String (nullable)
+  notes: String (nullable)
+  isActive: Boolean (default: true)
+  createdAt: DateTime (auto)
+}
+```
+
+**الراوتس:**
+- `GET /api/customers` - جميع العملاء
+- `GET /api/customers/:id` - بيانات عميل
+- `GET /api/customers/type/:customerType` - العملاء حسب النوع
+- `GET /api/customers/governorates` - جميع المحافظات
+- `GET /api/customers/cities/:governorate` - المدن بمحافظة
+- `GET /api/customers/count` - عداد العملاء
+- `POST /api/customers` - إضافة عميل جديد
+- `PUT /api/customers/:id` - تحديث بيانات عميل
+- `DELETE /api/customers/:id` - حذف عميل
+
+**ملحوظات:**
+- دعم رفع صور البطاقة (FormData)
+- التحقق من الرقم القومي الفريد لكل شركة
+
+---
+
+### Task 4.2: Employees Module
+**الوصف:** إدارة الموظفين والفنيين
+
+**الحقول المطلوبة:**
+```typescript
+Employee {
+  id: Int (PK)
+  companyId: Int (FK → Company)
+  fullName: String (required)
+  nationalId: String (required, unique per company)
+  role: Enum (SalesRep, Technician, Manager, Admin)
+  primaryNumber: String (required)
+  secondaryNumber: String (nullable)
+  idCardImage: String (URL, nullable)
+  governorate: String (required)
+  city: String (required)
+  district: String (required)
+  address: String (nullable)
+  salary: Decimal (nullable)
+  hireDate: DateTime
+  isEmployed: Boolean (default: true)
+  notes: String (nullable)
+  createdAt: DateTime (auto)
+}
+```
+
+**الراوتس:**
+- `GET /api/employees` - جميع الموظفين
+- `GET /api/employees/:id` - بيانات موظف
+- `GET /api/employees/role/:role` - الموظفين حسب الدور
+- `GET /api/employees/roles` - جميع الأدوار المتاحة
+- `POST /api/employees` - إضافة موظف جديد
+- `PUT /api/employees/:id` - تحديث بيانات موظف
+- `DELETE /api/employees/:id` - حذف موظف
+
+---
+
+## المرحلة الخامسة: Invoices و Items 🧾
+
+### Task 5.1: Invoices Module ⭐ أولوية عالية جداً
+**الوصف:** إدارة الفواتير والعقود
+
+**الحقول المطلوبة:**
+```typescript
+Invoice {
+  id: Int (PK)
+  companyId: Int (FK → Company)
+  customerId: Int (FK → Customer)
+  salesRepId: Int (FK → Employee)
+  technicianId: Int (FK → Employee, nullable)
+  totalAmount: Decimal (required)
+  discountAmount: Decimal (default: 0)
+  discountPercentage: Decimal (default: 0)
+  finalAmount: Decimal (محسوبة)
+  saleType: Enum (Cash, Installment)
+  maintenancePeriod: Int (شهور الضمان)
+  paidAtContract: Decimal (المدفوع عند الإبرام)
+  paidAtInstallation: Decimal (المدفوع عند التركيب)
+  installationCostType: Enum (Fixed, Percentage)
+  installationCostValue: Decimal
+  contractDate: DateTime (required)
+  installationDate: DateTime
+  contractNotes: String (nullable)
+  status: Enum (Draft, Confirmed, Completed, Cancelled)
+  createdAt: DateTime (auto)
+}
+```
+
+**الراوتس:**
+- `GET /api/invoices` - جميع الفواتير
+- `GET /api/invoices/:id` - تفاصيل فاتورة
+- `GET /api/invoices/customer/:customerId` - فواتير عميل
+- `GET /api/invoices/recent` - آخر 5 فواتير
+- `GET /api/invoices/monthly-revenue` - إجمالي الإيرادات الشهري
+- `GET /api/invoices/statistics` - إحصائيات الفواتير
+- `POST /api/invoices` - إنشاء فاتورة جديدة
+- `PUT /api/invoices/:id` - تحديث فاتورة
+- `DELETE /api/invoices/:id` - حذف فاتورة
+
+**الحسابات:**
+```
+finalAmount = totalAmount - discountAmount
+installationCost = installationCostType === 'Fixed' 
+                   ? installationCostValue 
+                   : (totalAmount * installationCostValue) / 100
+remainingPayment = totalAmount - paidAtContract - paidAtInstallation
+```
+
+---
+
+### Task 5.2: InvoiceItems Module
+**الوصف:** بنود الفاتورة (منتجات، خدمات، ملحقات)
+
+**الحقول المطلوبة:**
+```typescript
+InvoiceItem {
+  id: Int (PK)
+  invoiceId: Int (FK → Invoice)
+  companyId: Int (FK → Company)
+  productId: Int (FK → Product, nullable)
+  serviceId: Int (FK → Service, nullable)
+  accessoryId: Int (FK → Accessory, nullable)
+  quantity: Int (required)
+  unitPrice: Decimal (required)
+  subtotal: Decimal (محسوبة: quantity × unitPrice)
+  notes: String (nullable)
+  createdAt: DateTime (auto)
+}
+```
+
+**الراوتس:**
+- `GET /api/invoice-items` - جميع البنود
+- `GET /api/invoices/:invoiceId/items` - بنود فاتورة
+- `POST /api/invoice-items` - إضافة بند
+- `PUT /api/invoice-items/:id` - تحديث بند
+- `DELETE /api/invoice-items/:id` - حذف بند
+
+**المنطق:**
+- يجب تحديد واحد فقط من (productId, serviceId, accessoryId)
+- الـ subtotal يُحسب تلقائياً
+- تحديث totalAmount في الفاتورة عند إضافة/تعديل/حذف بند
+
+---
+
+## المرحلة السادسة: Maintenance 🔧
+
+### Task 6.1: Maintenance Module
+**الوصف:** إدارة الصيانة والخدمات
+
+**الحقول المطلوبة:**
+```typescript
+Maintenance {
+  id: Int (PK)
+  companyId: Int (FK → Company)
+  customerId: Int (FK → Customer)
+  productId: Int (FK → Product, nullable)
+  serviceId: Int (FK → Service)
+  technicianId: Int (FK → Employee)
+  maintenanceDate: DateTime (required)
+  completionDate: DateTime (nullable)
+  price: Decimal
+  status: Enum (Pending, InProgress, Completed, Cancelled)
+  notes: String (nullable)
+  createdAt: DateTime (auto)
+}
+```
+
+**الراوتس:**
+- `GET /api/maintenances` - جميع الصيانات
+- `GET /api/maintenances/:id` - تفاصيل صيانة
+- `GET /api/maintenances/customer/:customerId` - صيانات عميل
+- `GET /api/maintenances/upcoming` - الصيانات المعلقة
+- `GET /api/maintenances/upcoming-count` - عداد الصيانات المعلقة
+- `GET /api/maintenances/upcoming-list` - أول 5 صيانات معلقة
+- `POST /api/maintenances` - إنشاء صيانة
+- `PUT /api/maintenances/:id` - تحديث صيانة
+- `DELETE /api/maintenances/:id` - حذف صيانة
+
+---
+
+## المرحلة السابعة: Installments و Payments 💳
+
+### Task 7.1: Installments Module ⭐ أولوية عالية جداً
+**الوصف:** إدارة خطط التقسيط
+
+**الحقول المطلوبة:**
+```typescript
+Installment {
+  id: Int (PK)
+  invoiceId: Int (FK → Invoice, unique)
+  numberOfMonths: Int (required)
+  monthlyInstallment: Decimal (required)
+  collectionStartDate: DateTime (required)
+  collectionEndDate: DateTime (required)
+  totalAmount: Decimal (numberOfMonths × monthlyInstallment)
+  amountPaid: Decimal (default: 0)
+  isCompleted: Boolean (default: false)
+  notes: String (nullable)
+  createdAt: DateTime (auto)
+}
+```
+
+**الراوتس:**
+- `GET /api/installments` - جميع خطط التقسيط
+- `GET /api/installments/:id` - تفاصيل خطة
+- `GET /api/installments/invoice/:invoiceId` - خطة فاتورة
+- `GET /api/installments/pending-count` - عداد الدفعات المعلقة
+- `POST /api/installments` - إنشاء خطة جديدة
+- `PUT /api/installments/:id` - تحديث خطة
+- `DELETE /api/installments/:id` - حذف خطة
+
+---
+
+### Task 7.2: InstallmentPayments Module ⭐ أولوية عالية جداً
+**الوصف:** إدارة دفعات التقسيط والتتبع
+
+**الحقول المطلوبة:**
+```typescript
+InstallmentPayment {
+  id: Int (PK)
+  installmentId: Int (FK → Installment)
+  customerId: Int (FK → Customer)
+  monthNumber: Int (رقم الشهر: 1-12)
+  amountDue: Decimal (required)
+  amountPaid: Decimal (default: 0)
+  carryoverAmount: Decimal (default: 0) // المبلغ المتبقي من الشهر السابق
+  overdueAmount: Decimal (default: 0)
+  status: Enum (Pending, Partial, Paid, Overdue)
+  dueDate: DateTime (required)
+  paymentDate: DateTime (nullable)
+  notes: String (nullable)
+  createdAt: DateTime (auto)
+}
+```
+
+**الراوتس:**
+- `GET /api/installment-payments` - جميع الدفعات
+- `GET /api/installment-payments/:id` - تفاصيل دفعة
+- `GET /api/installments/:installmentId/payments` - دفعات تقسيط
+- `GET /api/installment-payments/customer/:customerId` - دفعات عميل
+- `GET /api/payments/overdue-count` - عداد الدفعات المتأخرة
+- `GET /api/payments/overdue-list` - قائمة الدفعات المتأخرة
+- `POST /api/installment-payments` - تسجيل دفعة جديدة
+- `PUT /api/installment-payments/:id` - تحديث دفعة
+- `DELETE /api/installment-payments/:id` - حذف دفعة
+
+**منطق الدفعات المعقد:**
+```
+عند تسجيل دفعة:
+1. إذا amountPaid === amountDue → Status = "Paid"
+2. إذا 0 < amountPaid < amountDue:
+   - Status = "Partial"
+   - carryoverAmount = amountDue - amountPaid
+   - أضف carryoverAmount للدفعة التالية
+3. إذا amountPaid === 0 → Status = "Pending"
+4. إذا paymentDate > dueDate → Status = "Overdue"
+
+عند التعديل:
+- احذف الـ carryoverAmount القديم من الدفعة التالية
+- أضف الـ carryoverAmount الجديد
+```
+
+---
+
+## المرحلة الثامنة: التحليلات والتقارير 📊
+
+### Task 8.1: Analytics و Reports Module
+**الوصف:** تقارير وإحصائيات المبيعات والأداء
+
+**الراوتس:**
+- `GET /api/analytics/dashboard` - ملخص لوحة التحكم
+- `GET /api/analytics/revenue/monthly` - الإيرادات الشهرية
+- `GET /api/analytics/revenue/yearly` - الإيرادات السنوية
+- `GET /api/analytics/sales/by-rep` - المبيعات حسب الموظف
+- `GET /api/analytics/products/top-selling` - أكثر المنتجات مبيعة
+- `GET /api/analytics/customers/top` - أفضل العملاء
+- `GET /api/analytics/payment-status` - حالة الدفعات
+
+**البيانات المرجعة:**
 ```json
 {
-  "success": true,
-  "updated": {
-    /* Company Object */
+  "dashboard": {
+    "totalCustomers": 150,
+    "totalInvoices": 250,
+    "pendingInstallments": 45,
+    "overdueDuePayments": 12,
+    "lowStockProducts": 8,
+    "upcomingMaintenances": 20
+  },
+  "revenue": {
+    "thisMonth": 45000,
+    "lastMonth": 38000,
+    "thisYear": 420000,
+    "growth": "18.4%"
   }
 }
 ```
 
 ---
 
-## 👥 **2. Users Routes**
+# 📋 مراجع قاعدة البيانات
 
-### **GET Routes**
+## العلاقات الرئيسية
 
-```http
-GET /api/users
 ```
+Company (1) ──→ (Many) User
+Company (1) ──→ (Many) Customer
+Company (1) ──→ (Many) Employee
+Company (1) ──→ (Many) Supplier
+Company (1) ──→ (Many) Product
+Company (1) ──→ (Many) Accessory
+Company (1) ──→ (Many) Service
+Company (1) ──→ (Many) Invoice
+Company (1) ──→ (Many) Maintenance
 
-**Response:**
+Supplier (1) ──→ (Many) Product
+Supplier (1) ──→ (Many) Accessory
 
-```json
-{
-  "data": [
-    {
-      "UserID": 1,
-      "CompanyID": 1,
-      "FullName": "أنس علي",
-      "Email": "developer@alnada.com",
-      "Role": "developer",
-      "Status": "Active",
-      "CreatedAt": "2023-01-15T10:00:00Z"
-    }
-  ]
-}
-```
+Product (Many) ←→ (Many) Accessory (ProductAccessory)
 
----
+Customer (1) ──→ (Many) Invoice
+Customer (1) ──→ (Many) Maintenance
+Customer (1) ──→ (Many) InstallmentPayment
 
-### **POST Routes**
+Employee (1) ──→ (Many) Invoice (as SalesRep)
+Employee (1) ──→ (Many) Invoice (as Technician)
+Employee (1) ──→ (Many) Maintenance (as Technician)
 
-```http
-POST /api/users
-```
+Invoice (1) ──→ (Many) InvoiceItem
+Invoice (1) ──→ (1) Installment
 
-**Body:**
+Installment (1) ──→ (Many) InstallmentPayment
 
-```json
-{
-  "CompanyID": 1,
-  "FullName": "محمد أحمد",
-  "Email": "user@example.com",
-  "PasswordHash": "hashed_password",
-  "Role": "employee",
-  "Status": "Active"
-}
+Service (1) ──→ (Many) InvoiceItem
+Service (1) ──→ (Many) Maintenance
+
+Product (1) ──→ (Many) InvoiceItem
+Product (1) ──→ (Many) Maintenance
+
+Accessory (1) ──→ (Many) InvoiceItem
 ```
 
 ---
 
-### **PUT Routes**
+# 🔌 الراوتس الكاملة
 
-```http
-PUT /api/users/{UserID}
-```
+## 1️⃣ Companies Routes
 
-**Body:** Same as POST
-
----
-
-### **DELETE Routes**
-
-```http
-DELETE /api/users/{UserID}
-```
+| الطريقة | الـ Endpoint | الوصف | المميزات |
+|-------|-----------|-------|---------|
+| GET | `/api/companies` | جميع الشركات | pagination, filtering |
+| GET | `/api/companies/:id` | شركة محددة | مع العلاقات |
+| POST | `/api/companies` | إنشاء شركة | validation |
+| PUT | `/api/companies/:id` | تحديث بيانات | partial update |
+| PUT | `/api/companies/:id/subscription` | تحديث الاشتراك | تاريخ الانتهاء |
+| DELETE | `/api/companies/:id` | حذف شركة | cascade delete |
 
 ---
 
-## 🧑‍💼 **3. Customers Routes**
+## 2️⃣ Users Routes
 
-### **GET Routes**
-
-```http
-GET /api/customers
-GET /api/customers/count
-GET /api/customerTypes
-GET /api/governorates
-GET /api/cities
-```
-
-**Response Examples:**
-
-```json
-// GET /api/customers
-{
-  "data": [
-    {
-      "CustomerID": 1,
-      "FullName": "محمد علي عبدالله",
-      "CustomerType": "Installation",
-      "NationalID": "12345678901234",
-      "IDCardImage": "url",
-      "PrimaryNumber": "01234567890",
-      "SecondaryNumber": "01098765432",
-      "Address": {
-        "Governorate": "القاهرة",
-        "City": "مدينة نصر",
-        "District": "الحي الأول"
-      },
-      "CompanyID": 1,
-      "CreatedAt": "2024-01-10T10:00:00Z"
-    }
-  ]
-}
-
-// GET /api/customers/count
-{ "data": 6 }
-
-// GET /api/customerTypes
-{ "data": ["Installation", "Maintenance"] }
-
-// GET /api/governorates
-{ "data": ["القاهرة", "الجيزة", "الإسكندرية"] }
-
-// GET /api/cities
-{ "data": ["مدينة نصر", "الدقي", "سموحة", ...] }
-```
+| الطريقة | الـ Endpoint | الوصف |
+|-------|-----------|-------|
+| GET | `/api/users` | جميع المستخدمين |
+| GET | `/api/users/:id` | مستخدم محدد |
+| GET | `/api/users/company/:companyId` | مستخدمي شركة |
+| POST | `/api/users` | إنشاء مستخدم |
+| PUT | `/api/users/:id` | تحديث المستخدم |
+| PUT | `/api/users/:id/password` | تغيير كلمة المرور |
+| DELETE | `/api/users/:id` | حذف مستخدم |
 
 ---
 
-### **POST Routes**
+## 3️⃣ Customers Routes
 
-```http
-POST /api/customers
-```
-
-**Body (FormData):**
-
-```
-FullName: "محمد علي"
-CustomerType: "Installation"
-NationalID: "12345678901234"
-IDCardImage: File
-PrimaryNumber: "01234567890"
-SecondaryNumber: "01098765432"
-Address: '{"Governorate":"القاهرة","City":"مدينة نصر","District":"الحي الأول"}'
-CompanyID: 1
-```
+| الطريقة | الـ Endpoint | الوصف |
+|-------|-----------|-------|
+| GET | `/api/customers` | جميع العملاء |
+| GET | `/api/customers/:id` | عميل محدد |
+| GET | `/api/customers/type/:type` | حسب النوع |
+| GET | `/api/customers/count` | عداد العملاء |
+| GET | `/api/customers/governorates` | قائمة المحافظات |
+| GET | `/api/customers/cities/:governorate` | المدن |
+| POST | `/api/customers` | إضافة عميل |
+| PUT | `/api/customers/:id` | تحديث عميل |
+| DELETE | `/api/customers/:id` | حذف عميل |
 
 ---
 
-### **PUT Routes**
+## 4️⃣ Employees Routes
 
-```http
-PUT /api/customers/{CustomerID}
-```
-
-**Body:** Same as POST
-
----
-
-### **DELETE Routes**
-
-```http
-DELETE /api/customers/{CustomerID}
-```
+| الطريقة | الـ Endpoint | الوصف |
+|-------|-----------|-------|
+| GET | `/api/employees` | جميع الموظفين |
+| GET | `/api/employees/:id` | موظف محدد |
+| GET | `/api/employees/role/:role` | حسب الدور |
+| GET | `/api/employees/roles` | جميع الأدوار |
+| POST | `/api/employees` | إضافة موظف |
+| PUT | `/api/employees/:id` | تحديث موظف |
+| DELETE | `/api/employees/:id` | حذف موظف |
 
 ---
 
-## 👷 **4. Employees Routes**
+## 5️⃣ Suppliers Routes
 
-### **GET Routes**
-
-```http
-GET /api/employees
-GET /api/roles
-```
-
-**Response:**
-
-```json
-// GET /api/employees
-{
-  "data": [
-    {
-      "EmployeeID": 1,
-      "FullName": "محمود حسن",
-      "NationalID": "22334455667788",
-      "IDCardImage": "url",
-      "Role": "SalesRep",
-      "PrimaryNumber": "01087654321",
-      "SecondaryNumber": "01233445566",
-      "Address": {
-        "Governorate": "القاهرة",
-        "City": "الشروق",
-        "District": "المنطقة الأولى"
-      },
-      "CompanyID": 1,
-      "IsEmployed": true
-    }
-  ]
-}
-
-// GET /api/roles
-{ "data": ["SalesRep", "Technician"] }
-```
+| الطريقة | الـ Endpoint | الوصف |
+|-------|-----------|-------|
+| GET | `/api/suppliers` | جميع الموردين |
+| GET | `/api/suppliers/:id` | مورد محدد |
+| POST | `/api/suppliers` | إضافة مورد |
+| PUT | `/api/suppliers/:id` | تحديث مورد |
+| DELETE | `/api/suppliers/:id` | حذف مورد |
 
 ---
 
-### **POST/PUT/DELETE Routes**
-
-Same pattern as Customers with FormData support
-
----
-
-## 🏭 **5. Suppliers Routes**
-
-### **GET Routes**
-
-```http
-GET /api/suppliers
-```
-
-**Response:**
-
-```json
-{
-  "data": [
-    {
-      "SupplierID": 1,
-      "Name": "شركة فلاتر مصر",
-      "ContactInfo": "01234567890 - filters@egypt.com",
-      "CompanyID": 1
-    }
-  ]
-}
-```
-
----
-
-### **POST Routes**
-
-```http
-POST /api/suppliers
-```
-
-**Body:**
-
-```json
-{
-  "Name": "شركة جديدة",
-  "ContactInfo": "0123456789",
-  "CompanyID": 1
-}
-```
-
----
-
-### **PUT/DELETE Routes**
-
-```http
-PUT /api/suppliers/{SupplierID}
-DELETE /api/suppliers/{SupplierID}
-```
-
----
-
-## 📦 **6. Products Routes**
-
-### **GET Routes**
-
-```http
-GET /api/products
-GET /api/products/low-stock-count
-GET /api/categories
-```
-
-**Response:**
-
-```json
-// GET /api/products
-{
-  "data": [
-    {
-      "ProductID": 1,
-      "Name": "فلتر مياه 7 مراحل",
-      "Category": "فلاتر المياه",
-      "Price": 1500,
-      "Stock": 25,
-      "SupplierID": 1,
-      "CompanyID": 1
-    }
-  ]
-}
-
-// GET /api/products/low-stock-count
-{ "data": 1 }  // عدد المنتجات التي Stock < 10
-
-// GET /api/categories
-{ "data": ["فلاتر المياه", "تكييفات"] }
-```
-
----
-
-### **POST/PUT/DELETE Routes**
-
-Standard CRUD operations
-
----
-
-## 🔧 **7. Accessories Routes**
-
-### **GET Routes**
-
-```http
-GET /api/accessories
-```
-
-**Response:**
-
-```json
-{
-  "data": [
-    {
-      "AccessoryID": 1,
-      "Name": "شمعة فلتر",
-      "Price": 50,
-      "Stock": 100,
-      "SupplierID": 1,
-      "CompanyID": 1
-    }
-  ]
-}
-```
-
----
-
-### **POST/PUT/DELETE Routes**
-
-Standard CRUD operations
-
----
-
-## 🔗 **8. Product-Accessories Routes**
-
-### **GET Routes**
-
-```http
-GET /api/productAccessories
-```
-
-**Response:**
-
-```json
-{
-  "data": [
-    {
-      "ProductID": 1,
-      "AccessoryID": 1
-    }
-  ]
-}
-```
-
----
-
-### **POST Routes**
-
-```http
-POST /api/productAccessories
-```
-
-**Body:**
-
-```json
-{
-  "ProductID": 1,
-  "AccessoryID": 2
-}
-```
-
-**Note:** يرفض التكرار (Duplicate detection)
-
----
-
-### **DELETE Routes**
-
-```http
-DELETE /api/productAccessories/product/{ProductID}
-```
-
-يحذف **جميع** الـ Accessories المرتبطة بالمنتج
-
----
-
-## 🛠️ **9. Services Routes**
-
-### **GET Routes**
-
-```http
-GET /api/services
-```
-
-**Response:**
-
-```json
-{
-  "data": [
-    {
-      "ServiceID": 1,
-      "Name": "صيانة فلتر",
-      "Description": "صيانة دورية للفلتر وتغيير الشمعات",
-      "Price": 100,
-      "CompanyID": 1
-    }
-  ]
-}
-```
-
----
-
-### **POST/PUT/DELETE Routes**
-
-Standard CRUD operations
-
----
-
-## 🔧 **10. Maintenances Routes**
-
-### **GET Routes**
-
-```http
-GET /api/maintenances
-GET /api/maintenances/upcoming-count
-GET /api/maintenances/upcoming-list
-```
-
-**Response:**
-
-```json
-// GET /api/maintenances
-{
-  "data": [
-    {
-      "MaintenanceID": 1,
-      "CustomerID": 1,
-      "ServiceID": 1,
-      "ProductID": 1,
-      "MaintenanceDate": "2025-11-04T10:00:00Z",
-      "Notes": "صيانة دورية",
-      "Price": 100,
-      "CompanyID": 1,
-      "Status": "Pending",
-      "TechnicianID": 2
-    }
-  ]
-}
-
-// GET /api/maintenances/upcoming-count
-{ "data": 2 }  // الصيانات المعلقة (Pending)
-
-// GET /api/maintenances/upcoming-list
-{
-  "data": [/* أول 5 صيانات Pending خلال 7 أيام */]
-}
-```
-
----
-
-### **POST/PUT/DELETE Routes**
-
-Standard CRUD operations
-
----
-
-## 🧾 **11. Invoices Routes**
-
-### **GET Routes**
-
-```http
-GET /api/invoices
-GET /api/invoices/recent
-GET /api/invoices/monthly-revenue
-```
-
-**Response:**
-
-```json
-// GET /api/invoices
-{
-  "data": [
-    {
-      "InvoiceID": 1,
-      "TechnicianID": 2,
-      "SalesRepID": 1,
-      "CustomerID": 1,
-      "TotalAmount": 1800,
-      "MaintenancePeriod": 1,
-      "PaidAtInstallation": 0,
-      "PaidAtContract": 1800,
-      "InstallationDate": "2024-01-15T10:00:00Z",
-      "ContractDate": "2024-01-10T10:00:00Z",
-      "SaleType": "Cash",
-      "CompanyID": 1,
-      "DiscountAmount": 0,
-      "InstallationCostType": "Percentage",
-      "InstallationCostValue": 0,
-      "ContractNotes": ""
-    }
-  ]
-}
-
-// GET /api/invoices/recent
-{ "data": [/* آخر 5 فواتير مرتبة بالتاريخ */] }
-
-// GET /api/invoices/monthly-revenue
-{ "data": 11600 }  // مجموع TotalAmount لجميع الفواتير
-```
-
----
-
-### **POST/PUT/DELETE Routes**
-
-Standard CRUD operations
-
----
-
-## 📋 **12. Invoice Items Routes**
-
-### **GET Routes**
-
-```http
-GET /api/invoiceItems
-```
-
-**Response:**
-
-```json
-{
-  "data": [
-    {
-      "InvoiceItemID": 1,
-      "InvoiceID": 1,
-      "ProductID": 1,
-      "AccessoryID": null,
-      "ServiceID": null,
-      "Quantity": 1,
-      "UnitPrice": 0,
-      "Subtotal": 0,
-      "CompanyID": 1
-    }
-  ]
-}
-```
-
----
-
-### **POST Routes**
-
-```http
-POST /api/invoiceItems
-```
-
-**Body:**
-
-```json
-{
-  "InvoiceID": 1,
-  "ProductID": 2,
-  "AccessoryID": null,
-  "ServiceID": null,
-  "Quantity": 3,
-  "UnitPrice": 150,
-  "CompanyID": 1
-}
-```
-
-**Auto-calculates:** `Subtotal = Quantity × UnitPrice`
-
----
-
-### **PUT Routes**
-
-```http
-PUT /api/invoiceItems/{InvoiceItemID}
-```
-
----
-
-### **DELETE Routes**
-
-```http
-DELETE /api/invoiceItems/{InvoiceItemID}
-```
-
----
-
-## 💳 **13. Installments Routes**
-
-### **GET Routes**
-
-```http
-GET /api/installments
-GET /api/installments/pending-count
-```
-
-**Response:**
-
-```json
-// GET /api/installments
-{
-  "data": [
-    {
-      "InstallmentID": 1,
-      "InvoiceID": 2,
-      "NumberOfMonths": 12,
-      "CollectionStartDate": "2025-02-01T00:00:00Z",
-      "CollectionEndDate": "2026-01-31T00:00:00Z",
-      "MonthlyInstallment": 291.67
-    }
-  ]
-}
-
-// GET /api/installments/pending-count
-{ "data": 18 }  // عدد الدفعات المعلقة (Pending)
-```
-
----
-
-### **POST/PUT/DELETE Routes**
-
-Standard CRUD operations
-
----
-
-## 💰 **14. Installment Payments Routes**
-
-### **GET Routes**
-
-```http
-GET /api/installmentPayments
-GET /api/payments/overdue-count
-```
-
-**Response:**
-
-```json
-// GET /api/installmentPayments
-{
-  "data": [
-    {
-      "PaymentID": 1,
-      "InstallmentID": 1,
-      "CustomerID": 1,
-      "Status": "Paid",
-      "OverdueAmount": 0,
-      "AmountPaid": 291.67,
-      "AmountDue": 291.67,
-      "CarryoverAmount": 0,
-      "Notes": "دفع الشهر الأول",
-      "PaymentDate": "2025-02-10T10:00:00Z",
-      "DueDate": "2025-02-01T00:00:00Z"
-    }
-  ]
-}
-
-// GET /api/payments/overdue-count
-{ "data": 0 }  // الدفعات المتأخرة (Overdue أو Pending بعد DueDate)
-```
-
----
-
-### **POST Routes**
-
-```http
-POST /api/installmentPayments
-```
-
-**Body:**
-
-```json
-{
-  "InstallmentID": 1,
-  "CustomerID": 1,
-  "AmountDue": 291.67,
-  "AmountPaid": 291.67,
-  "DueDate": "2025-02-01T00:00:00Z",
-  "PaymentDate": "2025-02-10T10:00:00Z",
-  "Notes": "دفع كامل"
-}
-```
-
-**Auto-calculates:**
-
-- `Status`: `"Paid"` | `"Partial"` | `"Pending"`
-- `OverdueAmount`: `AmountDue - AmountPaid` (if partial)
-- `CarryoverAmount`: المبلغ المتبقي يُضاف للدفعة القادمة
-
-**Logic:**
-
-- إذا `AmountPaid === AmountDue` → Status = `"Paid"`
-- إذا `0 < AmountPaid < AmountDue` → Status = `"Partial"` + CarryoverAmount يُضاف للدفعة القادمة
-- إذا `AmountPaid === 0` → Status = `"Pending"`
-
----
-
-### **PUT Routes**
-
-```http
-PUT /api/installmentPayments/{PaymentID}
-```
-
-**Body:** Same as POST
-
-**Special Logic:**
-
-- عند التعديل، يحذف الـ CarryoverAmount القديم من الدفعة التالية
-- ثم يضيف الـ CarryoverAmount الجديد للدفعة التالية
-
----
-
-### **DELETE Routes**
-
-```http
-DELETE /api/installmentPayments/{PaymentID}
-```
-
----
-
-## 📊 **Dashboard Aggregation Routes**
-
-| Route                                  | Description                              | Response Type |
-| -------------------------------------- | ---------------------------------------- | ------------- |
-| `GET /api/customers/count`             | عدد العملاء                              | `number`      |
-| `GET /api/installments/pending-count`  | عدد الدفعات المعلقة                      | `number`      |
-| `GET /api/maintenances/upcoming-count` | عدد الصيانات القادمة                     | `number`      |
-| `GET /api/products/low-stock-count`    | عدد المنتجات قليلة المخزون (< 10)        | `number`      |
-| `GET /api/invoices/monthly-revenue`    | إجمالي إيرادات الفواتير                  | `number`      |
-| `GET /api/payments/overdue-count`      | عدد الدفعات المتأخرة                     | `number`      |
-| `GET /api/invoices/recent`             | آخر 5 فواتير                             | `array`       |
-| `GET /api/maintenances/upcoming-list`  | أول 5 صيانات قادمة (Pending خلال 7 أيام) | `array`       |
-
----
-
-## 🔐 **Notes & Best Practices**
-
-### **1. FormData Handling**
-
-Routes التي تستخدم `FormData`:
-
-- `/api/customers` (POST/PUT) - لرفع `IDCardImage`
-- `/api/employees` (POST/PUT) - لرفع `IDCardImage`
-- `/api/companies/{id}/expiry` (PUT)
-
-**Example:**
-
-```javascript
-const formData = new FormData();
-formData.append('FullName', 'محمد');
-formData.append('IDCardImage', file);
-formData.append('Address', JSON.stringify({...}));
-```
-
----
-
-### **2. Auto-calculated Fields**
-
-| Entity                | Auto-calculated Fields                                    |
-| --------------------- | --------------------------------------------------------- |
-| `InvoiceItems`        | `InvoiceItemID`, `Subtotal`                               |
-| `InstallmentPayments` | `PaymentID`, `Status`, `OverdueAmount`, `CarryoverAmount` |
-| All Entities          | `{Entity}ID` (auto-increment)                             |
-
----
-
-### **3. Special Delete Behavior**
-
-```http
-DELETE /api/productAccessories/product/{ProductID}
-```
-
-يحذف **جميع** الـ Accessories المرتبطة بالمنتج (Cascade Delete)
-
----
-
-### **4. Error Responses**
-
-```json
-{
-  "error": "Item not found: 123"
-}
-```
-
-```json
-{
-  "error": "Duplicate"
-}
-```
-
-```json
-{
-  "error": "Unknown endpoint: /api/xyz"
-}
-```
-
----
-
-## 🎯 **Summary Table**
-
-| Entity              | GET | POST | PUT         | DELETE       | Special Routes                                         |
-| ------------------- | --- | ---- | ----------- | ------------ | ------------------------------------------------------ |
-| Companies           | ✅  | ❌   | ✅ (expiry) | ❌           | `/expiry`                                              |
-| Users               | ✅  | ✅   | ✅          | ✅           | -                                                      |
-| Customers           | ✅  | ✅   | ✅          | ✅           | `/count`, `/customerTypes`, `/governorates`, `/cities` |
-| Employees           | ✅  | ✅   | ✅          | ✅           | `/roles`                                               |
-| Suppliers           | ✅  | ✅   | ✅          | ✅           | -                                                      |
-| Products            | ✅  | ✅   | ✅          | ✅           | `/low-stock-count`, `/categories`                      |
-| Accessories         | ✅  | ✅   | ✅          | ✅           | -                                                      |
-| ProductAccessories  | ✅  | ✅   | ❌          | ✅ (cascade) | -                                                      |
-| Services            | ✅  | ✅   | ✅          | ✅           | -                                                      |
-| Maintenances        | ✅  | ✅   | ✅          | ✅           | `/upcoming-count`, `/upcoming-list`                    |
-| Invoices            | ✅  | ✅   | ✅          | ✅           | `/recent`, `/monthly-revenue`                          |
-| InvoiceItems        | ✅  | ✅   | ✅          | ✅           | -                                                      |
-| Installments        | ✅  | ✅   | ✅          | ✅           | `/pending-count`                                       |
-| InstallmentPayments | ✅  | ✅   | ✅          | ✅           | `/overdue-count`                                       |
-
----
-
-**Total Routes:** **~60 API endpoints**
+## 6️⃣ Products Routes
+
+| الطريقة | الـ Endpoint | الوصف |
+|-------|-----------|-------|
+| GET | `/api/products` | جميع المنتجات |
+| GET |
